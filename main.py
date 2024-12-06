@@ -25,15 +25,15 @@ def calibrate_preresistor(daq, channel, preresistor, nominal_resistance, test_re
 
 	for excitation in excitations:
 
-		daq.analog_write(0, 0)
+		daq.analog_write(channel, 0)
 
-		daq.analog_write(0, -excitation)
-		neg = daq.analog_read(0, 100, 1000)
+		daq.analog_write(channel, -excitation)
+		neg = daq.analog_read(channel, 100, 1000)
 
-		daq.analog_write(0, excitation)
-		pos = daq.analog_read(0, 100, 1000)
+		daq.analog_write(channel, excitation)
+		pos = daq.analog_read(channel, 100, 1000)
 
-		daq.analog_write(0, 0)
+		daq.analog_write(channel, 0)
 
 		I = excitation/preresistor.nominal_resistance * 0.5
 		V = (np.mean(pos) - np.mean(neg))/2
@@ -42,7 +42,6 @@ def calibrate_preresistor(daq, channel, preresistor, nominal_resistance, test_re
 
 	ax.plot(currents, voltages, 'k.')
 
-	fig.show()
 
 
 
@@ -80,8 +79,11 @@ if __name__ == "__main__":
 	preresistor_2.add_resistor(100_000, 100_000, config=[False, True])
 
 
-	preresistor_1.set(10000)
-	preresistor_2.set(10000)
+	preresistor_1.set(1000)
+	preresistor_2.set(1000)
 
 
 	calibrate_preresistor(daq, 0, preresistor_1, 10_000, 1_000)
+	calibrate_preresistor(daq, 1, preresistor_2, 10_000, 1_000)
+
+	plt.show()
