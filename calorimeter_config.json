@@ -1,43 +1,92 @@
 {
-    "preresistor": {
-        "name": "preresistor_1",
-        "digital_lines": {
-            "K0": 4,
-            "K1": 6
+    "calorimeter_1": {
+        "output_channel": 0,
+        "input_channel": 0,
+        "preresistor": {
+            "name": "preresistor_1",
+            "digital_lines": {
+                "K0": 4,
+                "K1": 5
+            },
+            "resistors": [
+                {
+                    "nominal_resistance": 1000,
+                    "real_resistance": 1000,
+                    "relay_configuration": [
+                        false,
+                        true
+                    ]
+                },
+                {
+                    "nominal_resistance": 10000,
+                    "real_resistance": 10000,
+                    "relay_configuration": [
+                        false,
+                        false
+                    ]
+                },
+                {
+                    "nominal_resistance": 100000,
+                    "real_resistance": 100000,
+                    "relay_configuration": [
+                        true,
+                        false
+                    ]
+                }
+            ]
         },
-        "resistors": [
-            {
-                "nominal_resistance": 1000,
-                "real_resistance": 1000,
-                "relay_configuration": [
-                    false,
-                    true
-                ]
-            },
-            {
-                "nominal_resistance": 10000,
-                "real_resistance": 10000,
-                "relay_configuration": [
-                    false,
-                    false
-                ]
-            },
-            {
-                "nominal_resistance": 100000,
-                "real_resistance": 100000,
-                "relay_configuration": [
-                    true,
-                    false
-                ]
+        "preamplifier": {
+            "name": "preamplifier_1",
+            "digital_lines": {
+                "A0": 2,
+                "A1": 3,
+                "WR": 0
             }
-        ]
+        }
     },
-    "preamplifier": {
-        "name": "preamplifier_1",
-        "digital_lines": {
-            "A0": 2,
-            "A1": 3,
-            "WR": 0
+    "calorimeter_2": {
+        "output_channel": 1,
+        "input_channel": 1,
+        "preresistor": {
+            "name": "preresistor_2",
+            "digital_lines": {
+                "K0": 6,
+                "K1": 7
+            },
+            "resistors": [
+                {
+                    "nominal_resistance": 1000,
+                    "real_resistance": 1000,
+                    "relay_configuration": [
+                        false,
+                        true
+                    ]
+                },
+                {
+                    "nominal_resistance": 10000,
+                    "real_resistance": 10000,
+                    "relay_configuration": [
+                        false,
+                        false
+                    ]
+                },
+                {
+                    "nominal_resistance": 100000,
+                    "real_resistance": 100000,
+                    "relay_configuration": [
+                        true,
+                        false
+                    ]
+                }
+            ]
+        },
+        "preamplifier": {
+            "name": "preamplifier_2",
+            "digital_lines": {
+                "A0": 2,
+                "A1": 3,
+                "WR": 1
+            }
         }
     }
 }

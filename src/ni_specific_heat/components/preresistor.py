@@ -61,6 +61,7 @@ class Preresistor:
 		nominal_resistance,
 		real_resistance,
 		config,
+		set_resistor: bool = False,
 		):
 
 		self._resistors[nominal_resistance] = Resistor(
@@ -71,11 +72,25 @@ class Preresistor:
 			digital_group_config=config,
 			)
 
+		if set_resistor:
+			self._active_resistor = self._resistors[nominal_resistance]
+			self._active_resistor.set()
+			logger.debug(f'Preresistor set {nominal_resistance}')
+
 
 	def set(self, resistance, callback=None):
-		self._active_resistor = self._resistors[resistance]
-		self._active_resistor.set()
-		logger.debug(f'Preresistor set to {resistance}')
+		if resistance == self._active_resistor.nominal_resistance:
+			logger.debug(f'Preresistor already set to {resistance}')
+			return self._active_resistor.real_resistance
+		else:
+			self._active_resistor = self._resistors[resistance]
+			self._active_resistor.set()
+			logger.debug(f'Preresistor set to {resistance}')
+			return self._active_resistor.real_resistance
+
+
+	def get(self):
+		return self._active_resistor.real_resistance
 
 
 	@property

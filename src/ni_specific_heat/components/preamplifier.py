@@ -51,8 +51,8 @@ class Preamplifier:
 
 
 	def _set_gain_10(self, callback=None):
-		line_1 = {'WR': True, 'A1': False, 'A0': True}
-		line_2 = {'WR': False, 'A1': False, 'A0': True}
+		line_1 = {'WR': True, 'A1': True, 'A0': False}
+		line_2 = {'WR': False, 'A1': True, 'A0': False}
 		self._daq.digital_output_groups[self._key].write(self._make_boolean_list(line_1))
 		self._daq.digital_output_groups[self._key].write(self._make_boolean_list(line_2))
 		self.gain = 10
@@ -61,8 +61,8 @@ class Preamplifier:
 
 
 	def _set_gain_100(self, callback=None):
-		line_1 = {'WR': True, 'A1': True, 'A0': False}
-		line_2 = {'WR': False, 'A1': True, 'A0': False}
+		line_1 = {'WR': True, 'A1': False, 'A0': True}
+		line_2 = {'WR': False, 'A1': False, 'A0': True}
 		self._daq.digital_output_groups[self._key].write(self._make_boolean_list(line_1))
 		self._daq.digital_output_groups[self._key].write(self._make_boolean_list(line_2))
 		self.gain = 100
@@ -98,4 +98,8 @@ class Preamplifier:
 				logger.warning(f'Gain not changed: {gain} not an allowed value.')
 		else:
 			logger.debug(f'Gain not changed: gain already at value.')
+
+
+	def get(self):
+		return self._gain
 

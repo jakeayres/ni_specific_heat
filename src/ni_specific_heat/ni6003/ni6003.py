@@ -42,6 +42,8 @@ class Ni6003:
 			lower_line_index=lower_index, 
 			upper_line_index=upper_index
 			)
+		logger.debug(f'Digital group created {name}')
+		logger.debug(f'{self.digital_output_groups[name]._handle}')
 
 
 	def digital_write(self, group_name, data):
