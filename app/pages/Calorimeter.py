@@ -28,26 +28,44 @@ if __name__ == "__main__":
 
 
 
-
+	fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+	plot = st.pyplot(fig)
 	time.sleep(1)
 
-	dfs = cal_1.measure_sweep(
-		low_current=1e-4, 
-		low_gain=10, 
-		low_preresistor=1_000,
-		high_current=5e-4,
-		high_gain=1,
-		high_preresistor=1_000,
-		rate=50_000,
-		samples=1_000,
-	)
 
-	fig, ax = plt.subplots()
 
-	st.dataframe(dfs[0])
+	with plot:
 
-	for i, df in enumerate(dfs):
-		ax.plot(df['time'], df['voltage'], label=f'{i}')
-	ax.legend(frameon=False)
+		dfs = cal_1.measure_sweep(
+			low_current=1e-4, 
+			low_gain=10, 
+			low_preresistor=1_000,
+			high_current=5e-4,
+			high_gain=10,
+			high_preresistor=1_000,
+			rate=50_000,
+			samples=1_000,
+		)
 
-	st.pyplot(fig)
+		for i, df in enumerate(dfs):
+			ax[0].plot(df['time'], df['voltage'], label=f'{i}')
+		ax[0].legend(frameon=False)
+
+		st.pyplot(fig)
+
+		dfs = cal_2.measure_sweep(
+			low_current=0.5e-4, 
+			low_gain=10, 
+			low_preresistor=1_000,
+			high_current=2.5e-4,
+			high_gain=10,
+			high_preresistor=1_000,
+			rate=50_000,
+			samples=1_000,
+		)
+
+		for i, df in enumerate(dfs):
+			ax[1].plot(df['time'], df['voltage'], label=f'{i}')
+		ax[1].legend(frameon=False)
+
+		st.pyplot(fig)

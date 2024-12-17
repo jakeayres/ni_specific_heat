@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import asyncio
 from loguru import logger
 from .preamplifier import Preamplifier
 from .preresistor import Preresistor
@@ -26,6 +27,12 @@ class Calorimeter:
 		self._input_channel = input_channel
 		self._preamplifier = preamplifier
 		self._preresistor = preresistor
+
+
+		self._excitation_callback = None
+		self._current_callback = None
+		self._voltage_callback = None
+		self._resistance_callback = None
 
 
 	@classmethod
@@ -96,10 +103,8 @@ class Calorimeter:
 		self.set_current(0)
 		self.preamplifier.set(1)
 		dfs = self._write_and_measure_multiple(
-			input_channel=0,
 			input_samples=1000,
 			input_rate=100000,
-			output_channel=0,
 			currents=[current, -current],
 			)
 		self.set_current(0)
@@ -130,33 +135,43 @@ class Calorimeter:
 			return 1
 
 
-	def set_current(self, current, change_resistor=True):
+	def set_current(self, current, change_resistor=True, callback=None):
 		""" Set a output current either using the currently active preresistor
-		or after changing to the most appropraite resistor
+		or after changing to the most appropriate resistor
 		"""
 		if change_resistor:
 			res = self._calculate_best_preresistor(current)
 			self._preresistor.set(res)
 		excitation = self._calculate_excitation(current)
 		self._daq.analog_write(output_channel=self._output_channel, data=excitation)
+		if self._current_callback is not None:
+			self._current_callback(current)
+		if self._excitation_callback is not None:
+			self._excitation_callback(excitation)
 		logger.debug(f'{self._name}: Excitation set: {excitation}')
+
+		if callback is not None:
+			callback(
+				{
+					'excitation': excitation,
+					'current': current,
+				}
+			)
 
 
 	def _write_and_measure(
 		self,
-		input_channel,
 		input_samples,
 		input_rate,
-		output_channel,
 		current,
 		):
 		excitation = self._calculate_excitation(current)
 
 		x = self._daq.analog_write_and_read(
-			input_channel=input_channel,
+			input_channel=self._input_channel,
 			input_samples=input_samples,
 			input_rate=input_rate,
-			output_channel=output_channel,
+			output_channel=self._output_channel,
 			output_value=excitation,
 		)
 
@@ -173,10 +188,8 @@ class Calorimeter:
 
 	def _write_and_measure_multiple(
 		self,
-		input_channel,
 		input_samples,
 		input_rate,
-		output_channel,
 		currents,
 		):
 
@@ -184,10 +197,8 @@ class Calorimeter:
 
 		for current in currents:
 			df = self._write_and_measure(
-				input_channel=input_channel,
 				input_samples=input_samples,
 				input_rate=input_rate,
-				output_channel=output_channel,
 				current=current,
 			)
 			dfs.append(df)
@@ -195,7 +206,72 @@ class Calorimeter:
 		return dfs
 
 
-	def measure_sweep_section(
+	def measure_voltage(
+		self,
+		samples,
+		rate,
+		callback=None,
+		):
+		x = self._daq.analog_read(
+			input_channel=self._input_channel,
+			samples=samples,
+			rate=rate,
+		)
+		if callback is not None:
+			callback(x)
+		return x
+
+
+	async def measure_resistance(
+		self,
+		current: float = 0.1e-3,
+		preresistor: int = None,
+		gain: int = None,
+		samples: int = 10000,
+		rate: int = 90000,
+		plot = None,
+		):
+
+		if preresistor is None:
+			preresistor = self.preresistor.get()
+
+		if gain is None:
+			gain = self.preamplifier.get()
+
+		self.preamplifier.set(gain)
+		self.set_current(0, change_resistor=False)
+		await asyncio.sleep(0.001)
+		self.preresistor.set(preresistor)
+		self.set_current(current, change_resistor=False)
+		await asyncio.sleep(0.001)
+		x = self.measure_voltage(10000, 90000)
+		if plot is not None:
+			plot.add_scatter_series('Pos', np.linspace(0, samples, samples), x)
+		self.set_current(0, change_resistor=False)
+		await asyncio.sleep(0.1)
+
+		self.set_current(0, change_resistor=False)
+		await asyncio.sleep(0.001)
+		self.preresistor.set(preresistor)
+		self.set_current(-current, change_resistor=False)
+		await asyncio.sleep(0.001)
+		y = self.measure_voltage(10000, 90000)
+		if plot is not None:
+			plot.add_scatter_series('Neg', np.linspace(0, samples, samples), y)
+		self.set_current(0, change_resistor=False)
+		await asyncio.sleep(0.001)
+
+		voltage = (np.mean(x) - np.mean(y)) / 2.0
+		if self._voltage_callback is not None:
+			self._voltage_callback(voltage)
+		resistance = voltage/current/gain
+		if self._resistance_callback is not None:
+			self._resistance_callback(resistance)
+		logger.info(f'{self._name}: V={voltage}, R={resistance}')
+		return {'voltage': voltage, 'resistance': resistance}
+
+
+	async def measure_sweep_section(
 		self, 
 		preresistor, 
 		gain, 
@@ -212,10 +288,8 @@ class Calorimeter:
 		self.set_current(start_current, change_resistor=False)
 
 		df = self._write_and_measure(
-			input_channel=0,
 			input_samples=samples,
 			input_rate=rate,
-			output_channel=0,
 			current=measure_current,
 		)
 
@@ -226,7 +300,7 @@ class Calorimeter:
 		return df
 
 
-	def measure_sweep(
+	async def measure_sweep(
 		self, 
 		low_current, 
 		low_gain, 
@@ -238,7 +312,7 @@ class Calorimeter:
 		samples,
 		):
 
-		positive_rising = self.measure_sweep_section(
+		positive_rising = await self.measure_sweep_section(
 			preresistor=high_preresistor,
 			gain=high_gain,
 			start_current=low_current,
@@ -248,7 +322,7 @@ class Calorimeter:
 			samples=samples,
 			)
 
-		positive_falling = self.measure_sweep_section(
+		positive_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
 			gain=low_gain,
 			start_current=high_current,
@@ -258,7 +332,7 @@ class Calorimeter:
 			samples=samples,
 			)
 
-		negative_rising = self.measure_sweep_section(
+		negative_rising = await self.measure_sweep_section(
 			preresistor=high_preresistor,
 			gain=high_gain,
 			start_current=-low_current,
@@ -268,7 +342,7 @@ class Calorimeter:
 			samples=samples,
 			)
 
-		negative_falling = self.measure_sweep_section(
+		negative_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
 			gain=low_gain,
 			start_current=-high_current,

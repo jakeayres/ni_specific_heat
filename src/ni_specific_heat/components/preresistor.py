@@ -55,6 +55,8 @@ class Preresistor:
 		self._resistors = {}
 		self._active_resistor = None
 
+		self._callbacks = []
+
 
 	def add_resistor(
 		self,
@@ -78,19 +80,34 @@ class Preresistor:
 			logger.debug(f'Preresistor set {nominal_resistance}')
 
 
+	def add_callback(self, callback):
+		self._callbacks.append(callback)
+
+
+	def _run_callbacks(self, value):
+		for callback in self._callbacks:
+			callback(value)
+
+
 	def set(self, resistance, callback=None):
 		if resistance == self._active_resistor.nominal_resistance:
 			logger.debug(f'Preresistor already set to {resistance}')
-			return self._active_resistor.real_resistance
 		else:
 			self._active_resistor = self._resistors[resistance]
 			self._active_resistor.set()
 			logger.debug(f'Preresistor set to {resistance}')
-			return self._active_resistor.real_resistance
-
-
-	def get(self):
+		if callback is not None:
+			callback(self._active_resistor.real_resistance)
+		self._run_callbacks(self._active_resistor.real_resistance)
 		return self._active_resistor.real_resistance
+
+
+	def get(self, callback=None):
+		if callback is not None:
+			callback(self._active_resistor.real_resistance)
+		self._run_callbacks(self._active_resistor.real_resistance)
+		return self._active_resistor.real_resistance
+
 
 
 	@property

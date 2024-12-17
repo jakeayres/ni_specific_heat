@@ -1,6 +1,7 @@
 import numpy as np
 import asyncio
 from scipy.optimize import curve_fit
+from loguru import logger
 
 from pyacquisition.visa import resource_manager
 from pyacquisition.instruments import Clock, Lakeshore_340
@@ -22,7 +23,8 @@ class StageThermometer(object):
 		self.heater_range = 0
 		self.heater_power = 0
 		self.stable = False
-		self._temperature_history = []
+		self._stability_history = []
+		
 
 
 	def get_temperature(self, callback=None):
@@ -49,7 +51,7 @@ class StageThermometer(object):
 	def set_setpoint(self, setpoint, callback=None):
 		if setpoint != self.setpoint:
 			self.stable = False
-			self._temperature_history = []
+			self._stability_history = []
 		self._lake.set_setpoint(self._output_channel, setpoint)
 		self.setpoint = setpoint
 		if callback is not None:
@@ -99,8 +101,17 @@ class StageThermometer(object):
 			return False
 
 
+	async def stabilize_temperature(self, setpoint, period=2):
+		""" Wait for temperature stability at setpoint """
+		logger.info(f'Stabilizing {setpoint:.2f} K')
+		self.set_setpoint(setpoint)
+		while self.stable is False:
+			await asyncio.sleep(period)
+		logger.info(f'Temperature stable at {setpoint:.2f} K')
+
 
 	async def monitor(self, period, callback):
+		""" Poll the lakeshore """
 
 		while True:
 			await asyncio.sleep(period)
@@ -110,23 +121,23 @@ class StageThermometer(object):
 				self.heater_range = self.get_heater_range()
 				self.heater_power = self.get_heater_power()
 
-				self._temperature_history.append(self.temperature)
-				if len(self._temperature_history) > 15:
-					self._temperature_history = self._temperature_history[-15:]
+				self._stability_history.append(self.temperature)
+				if len(self._stability_history) > 15:
+					self._stability_history = self._stability_history[-15:]
 
-				mean_close = self.close_to_setpoint(self._temperature_history, self.setpoint, tolerance=5e-3)
+				mean_close = self.close_to_setpoint(self._stability_history, self.setpoint, tolerance=5e-3)
 				close = self.close_to_setpoint([self.temperature], self.setpoint, tolerance=5e-3)
-				small_spread = self.small_enough_std(self._temperature_history, tolerance=5e-3)
+				small_spread = self.small_enough_std(self._stability_history, tolerance=5e-3)
 
-				if mean_close and close and small_spread and len(self._temperature_history)>12:
+				if mean_close and close and small_spread and len(self._stability_history)>12:
 					self.stable = True
 				else:
 					self.stable = False
 
 				try:
 					func = lambda x, a, b: a + b*x
-					x = np.linspace(0, len(self._temperature_history)*period, len(self._temperature_history))
-					popt, _ = curve_fit(func, x, self._temperature_history)
+					x = np.linspace(0, len(self._stability_history)*period, len(self._stability_history))
+					popt, _ = curve_fit(func, x, self._stability_history)
 					rate = popt[1]*60
 
 				except Exception as e:

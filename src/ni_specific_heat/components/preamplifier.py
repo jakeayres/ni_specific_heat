@@ -17,9 +17,20 @@ class Preamplifier:
 		self._key = key
 		self._digial_lines = digital_lines
 		self._daq.initialize_digital_output_group(self._key, min(digital_lines.values()), max(digital_lines.values()))
-
 		self.gain = None
+		self._callbacks = []
+		
 		self.set(1)
+
+
+
+	def add_callback(self, callback):
+		self._callbacks.append(callback)
+
+
+	def _run_callbacks(self, value):
+		for callback in self._callbacks:
+			callback(value)
 
 
 	def _make_boolean_list(self, config_dict):
@@ -48,6 +59,7 @@ class Preamplifier:
 		self.gain = 1
 		if callback is not None:
 			callback(self.gain)
+		self._run_callbacks(self.gain)
 
 
 	def _set_gain_10(self, callback=None):
@@ -58,6 +70,7 @@ class Preamplifier:
 		self.gain = 10
 		if callback is not None:
 			callback(self.gain)
+		self._run_callbacks(self.gain)
 
 
 	def _set_gain_100(self, callback=None):
@@ -68,6 +81,7 @@ class Preamplifier:
 		self.gain = 100
 		if callback is not None:
 			callback(self.gain)
+		self._run_callbacks(self.gain)
 
 
 	def _set_gain_1000(self, callback=None):
@@ -78,6 +92,7 @@ class Preamplifier:
 		self.gain = 1000
 		if callback is not None:
 			callback(self.gain)
+		self._run_callbacks(self.gain)
 
 
 	def set(self, gain, callback=None):
@@ -100,6 +115,9 @@ class Preamplifier:
 			logger.debug(f'Gain not changed: gain already at value.')
 
 
-	def get(self):
-		return self._gain
+	def get(self, callback=None):
+		if callback is not None:
+			callback(self.gain)
+		self._run_callbacks(self.gain)
+		return self.gain
 

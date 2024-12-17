@@ -13,6 +13,8 @@ class BarechipCalibration(object):
 
 	@property
 	def dataframe(self):
+		""" Pandas dataframe with 'resistance', 'temperature' columns
+		"""
 		return self._dataframe
 
 
