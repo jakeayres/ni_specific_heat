@@ -99,13 +99,28 @@ class Plot(Widget):
 		gui.set_value(self._series[key], [x_data, y_data])
 
 
+	def append_series(self, key, x_data, y_data):
+		x, y = self.get_data(key)
+		gui.set_value(self._series[key], [[*x, *x_data], [*y, *y_data]])
+
+
 	def get_data(self, key):
-		return gui.get_item_user_data(self._series[key])
+		data = gui.get_value(self._series[key])
+		return data[0], data[1]
 
 
 	def delete_series(self, key):
 		gui.delete_item(self.series_uuid(key))
 		self._series.pop(key, None)
+
+
+	def clear_series(self, key):
+		gui.set_value(self._series[key], [[], []])
+
+
+	def clear_all_series(self):
+		for k, v in self._series.items():
+			self.clear_series(k)
 
 
 	def delete_all_series(self):

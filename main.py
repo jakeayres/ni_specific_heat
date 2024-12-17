@@ -59,7 +59,13 @@ class CpExperiment:
 		self.heater_range_indicator = IntegerIndicator.add_to_parent(stage_window, 'Heater range', 0)
 		self.heater_power_indicator = DecimalIndicator.add_to_parent(stage_window, 'Heater power', 0, unit='%')
 		self.stable_indicator = BooleanIndicator.add_to_parent(stage_window, 'Stable', 0)
-		self.live_temperature_plot.add_series('temperature')
+		self.live_temperature_plot.add_series('temperature', [], [])
+		self.live_temperature_plot.add_series('setpoint', [], [])
+		gui.add_button(
+			parent=stage_window, 
+			label='Clear plot', 
+			callback=self.live_temperature_plot.clear_all_series,
+			)
 
 
 		""" Calorimeter window 1
@@ -247,7 +253,8 @@ class CpExperiment:
 		self.heater_power_indicator.set_value(data['heater_power'])
 		self.stable_indicator.set_value(data['stable'])
 
-		self.live_temperature_plot.up
+		self.live_temperature_plot.append_series('temperature', [time.time()], [data['temperature']])
+		self.live_temperature_plot.append_series('setpoint', [time.time()], [data['setpoint']])
 
 
 	def update_calorimeter_indicators(self, calorimeter, data):
