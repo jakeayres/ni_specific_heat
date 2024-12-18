@@ -1,11 +1,12 @@
 import numpy as np
 import asyncio
+import time
 from scipy.optimize import curve_fit
 from loguru import logger
 
 from pyacquisition.visa import resource_manager
 from pyacquisition.instruments import Clock, Lakeshore_340
-from pyacquisition.instruments.lakeshore.lakeshore_340 import InputChannel, OutputChannel
+from pyacquisition.instruments.lakeshore.lakeshore_340 import InputChannel, OutputChannel, State
 
 
 
@@ -20,11 +21,16 @@ class StageThermometer(object):
 
 		self.temperature = 0
 		self.setpoint = 0
+		self.ramp_rate = 0
 		self.heater_range = 0
 		self.heater_power = 0
 		self.stable = False
 		self._stability_history = []
-		
+		self._t0 = time.time()
+	
+
+	def _tolerance(self, setpoint):
+		return 1e-3 * (5 + 0.02*setpoint + 0.0005*setpoint*setpoint)
 
 
 	def get_temperature(self, callback=None):
@@ -57,6 +63,21 @@ class StageThermometer(object):
 		if callback is not None:
 			callback(setpoint)
 		return setpoint
+
+
+	def get_ramp_rate(self, callback=None):
+		ramp_rate = self._lake.get_ramp(self._output_channel)
+		if callback is not None:
+			callback(ramp_rate)
+		return ramp_rate
+
+
+	def set_ramp_rate(self, ramp_rate, callback=None):
+		self._lake.set_ramp(self._output_channel, State.ON, ramp_rate)
+		self.ramp_rate = ramp_rate
+		if callback is not None:
+			callback(ramp_rate)
+		return ramp_rate
 
 
 	def get_heater_range(self, callback=None):
@@ -103,11 +124,22 @@ class StageThermometer(object):
 
 	async def stabilize_temperature(self, setpoint, period=2):
 		""" Wait for temperature stability at setpoint """
-		logger.info(f'Stabilizing {setpoint:.2f} K')
+		logger.info(f'Stabilizing {setpoint:.2f} K. (Tol {self._tolerance(setpoint)})')
 		self.set_setpoint(setpoint)
 		while self.stable is False:
 			await asyncio.sleep(period)
 		logger.info(f'Temperature stable at {setpoint:.2f} K')
+
+
+	async def ramp_to_temperature(self, setpoint, ramp_rate, period=2):
+		""" Ramp to a desired setpoint """
+		logger.info(f'Setpoint ramping to {setpoint}K @ {ramp_rate}K/min')
+		self.set_ramp_rate(ramp_rate)
+		self.set_setpoint(setpoint)
+		while self.get_setpoint() != setpoint:
+			await asyncio.sleep(period)
+		logger.info(f'Setpoint reached {setpoint}K')
+
 
 
 	async def monitor(self, period, callback):
@@ -118,6 +150,7 @@ class StageThermometer(object):
 			try:
 				self.temperature = self.get_temperature()
 				self.setpoint = self.get_setpoint()
+				self.ramp_rate = self.get_ramp_rate()
 				self.heater_range = self.get_heater_range()
 				self.heater_power = self.get_heater_power()
 
@@ -125,9 +158,11 @@ class StageThermometer(object):
 				if len(self._stability_history) > 15:
 					self._stability_history = self._stability_history[-15:]
 
-				mean_close = self.close_to_setpoint(self._stability_history, self.setpoint, tolerance=5e-3)
-				close = self.close_to_setpoint([self.temperature], self.setpoint, tolerance=5e-3)
-				small_spread = self.small_enough_std(self._stability_history, tolerance=5e-3)
+				tolerance = self._tolerance(self.setpoint)
+
+				mean_close = self.close_to_setpoint(self._stability_history, self.setpoint, tolerance=tolerance)
+				close = self.close_to_setpoint([self.temperature], self.setpoint, tolerance=tolerance)
+				small_spread = self.small_enough_std(self._stability_history, tolerance=tolerance)
 
 				if mean_close and close and small_spread and len(self._stability_history)>12:
 					self.stable = True
@@ -145,9 +180,11 @@ class StageThermometer(object):
 
 
 				data = {
+					'time': time.time() - self._t0,
 					'temperature': self.temperature,
 					'setpoint': self.setpoint,
 					'rate': rate,
+					'ramp_rate': self.ramp_rate,
 					'heater_range': self.heater_range,
 					'heater_power': self.heater_power,
 					'stable': self.stable,

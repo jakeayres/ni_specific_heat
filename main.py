@@ -19,6 +19,9 @@ from ni_specific_heat.ui.indicators import DecimalIndicator, ScientificDecimalIn
 from ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
 from ni_specific_heat.ui.plot import Plot
 
+from ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
+from ni_specific_heat.routines.relaxation import setup_relaxations
+
 
 class CpExperiment:
 
@@ -43,7 +46,7 @@ class CpExperiment:
 
 	def _initialize_dearpygui(self):
 		gui.create_context()
-		gui.create_viewport(title='Custom Title', width=1100, height=600)
+		gui.create_viewport(title='Custom Title', width=1600, height=800)
 		gui.setup_dearpygui()
 
 
@@ -53,24 +56,43 @@ class CpExperiment:
 		"""
 		stage_window = gui.add_window(label='Stage Status', pos=(0, 0), width=300)
 		self.live_temperature_plot = Plot.add_to_parent(stage_window, height=200, width=-1)
-		self.temperature_indicator = ScientificDecimalIndicator.add_to_parent(stage_window, 'Temperature', 0, unit='K')
-		self.temperature_rate_indicator = ScientificDecimalIndicator.add_to_parent(stage_window, 'Rate', 0, unit='K/min')
-		self.setpoint_indicator = ScientificDecimalIndicator.add_to_parent(stage_window, 'Setpoint', 0, unit='K')
-		self.heater_range_indicator = IntegerIndicator.add_to_parent(stage_window, 'Heater range', 0)
-		self.heater_power_indicator = DecimalIndicator.add_to_parent(stage_window, 'Heater power', 0, unit='%')
-		self.stable_indicator = BooleanIndicator.add_to_parent(stage_window, 'Stable', 0)
-		self.live_temperature_plot.add_series('temperature', [], [])
-		self.live_temperature_plot.add_series('setpoint', [], [])
 		gui.add_button(
 			parent=stage_window, 
 			label='Clear plot', 
 			callback=self.live_temperature_plot.clear_all_series,
 			)
-
+		self.temperature_indicator = DecimalIndicator.add_to_parent(stage_window, 'Temperature', 0, unit='K')
+		self.temperature_rate_indicator = DecimalIndicator.add_to_parent(stage_window, 'Rate', 0, unit='K/min')
+		self.setpoint_indicator = DecimalIndicator.add_to_parent(stage_window, 'Setpoint', 0, unit='K')
+		self.ramp_rate_indicator = DecimalIndicator.add_to_parent(stage_window, 'Ramp rate', 0, unit='K/min')
+		self.heater_range_indicator = IntegerIndicator.add_to_parent(stage_window, 'Heater range', 0)
+		self.heater_power_indicator = DecimalIndicator.add_to_parent(stage_window, 'Heater power', 0, unit='%')
+		self.stable_indicator = BooleanIndicator.add_to_parent(stage_window, 'Stable', 0)
+		self.live_temperature_plot.add_series('temperature', [], [])
+		self.live_temperature_plot.add_series('setpoint', [], [])
+		setpoint_input = DecimalInput.add_to_parent(stage_window, 'Setpoint', value=290.00, unit='K')
+		ramp_rate_input = DecimalInput.add_to_parent(stage_window, 'Ramp rate', value=5.00, unit='K/min')
+		gui.add_button(
+			parent=stage_window, 
+			label='Ramp to', 
+			callback=lambda: partial(
+				self.queue_ramp_temperature,
+				setpoint=setpoint_input.value,
+				ramp_rate=ramp_rate_input.value,
+				)(),
+			)
+		gui.add_button(
+			parent=stage_window, 
+			label='Stabilize', 
+			callback=lambda: partial(
+				self.queue_stabilize_temperature,
+				setpoint=setpoint_input.value,
+				)(),
+			)
 
 		""" Calorimeter window 1
 		"""
-		calorimeter_window_1 = gui.add_window(label='Calorimeter A', pos=(300, 0), width=300)
+		calorimeter_window_1 = gui.add_window(label='Calorimeter A', pos=(950, 0), width=300)
 		self.live_voltage_plot_1 = Plot.add_to_parent(calorimeter_window_1, height=200, width=-1, yaxis_kwargs={})
 		self.preresistor_indicator_1 = IntegerIndicator.add_to_parent(calorimeter_window_1, 'Preresistor', 1000, unit='Ohms')
 		self.excitation_indicator_1 = DecimalIndicator.add_to_parent(calorimeter_window_1, 'Excitation', 0, unit='V')
@@ -86,61 +108,80 @@ class CpExperiment:
 		self.calorimeters[0]._voltage_callback = self.mean_voltage_indicator_1.set_value
 		self.calorimeters[0]._resistance_callback = self.resistance_indicator_1.set_value
 
+		gui.add_separator(parent=calorimeter_window_1)
+		with gui.group(horizontal=True, parent=calorimeter_window_1):
+			gui.add_button(
+				label='1x', 
+				callback=lambda: partial(
+					self.calorimeters[0].preamplifier.set, 
+					gain=1, 
+					)(),
+				)
+			gui.add_button(
+				label='10x', 
+				callback=lambda: partial(
+					self.calorimeters[0].preamplifier.set, 
+					gain=10, 
+					)(),
+				)
+			gui.add_button(
+				label='100x', 
+				callback=lambda: partial(
+					self.calorimeters[0].preamplifier.set, 
+					gain=100, 
+					)(),
+				)
+			gui.add_button(
+				label='1000x', 
+				callback=lambda: partial(
+					self.calorimeters[0].preamplifier.set, 
+					gain=1000, 
+					)(),
+				)
+
+		with gui.group(horizontal=True, parent=calorimeter_window_1):
+			gui.add_button(
+				label='1kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[0].preresistor.set, 
+					resistance=1000,
+					)(),
+				)
+			gui.add_button(
+				label='10kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[0].preresistor.set, 
+					resistance=10000, 
+					)(),
+				)
+			gui.add_button(
+				label='100kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[0].preresistor.set, 
+					resistance=100000, 
+					)(),
+				)
+
+		gui.add_separator(parent=calorimeter_window_1)
+		current_input_1 = DecimalInput.add_to_parent(calorimeter_window_1, 'Current', value=0.00, unit='mA')
 		gui.add_button(
 			parent=calorimeter_window_1, 
-			label='Set Gain 1', 
+			label='Queue measure', 
 			callback=lambda: partial(
-				self.calorimeters[0].preamplifier.set, 
-				gain=1, 
+				self.queue_measure_resistance,
+				calorimeter=0,
+				current=current_input_1.value*1e-3,
 				)(),
 			)
+
+		gui.add_separator(parent=calorimeter_window_1)
+		gui.add_text('Barechip Calibration', parent=calorimeter_window_1)
+		self.calibration_plot_1 = Plot.add_to_parent(calorimeter_window_1, height=200, width=-1, yaxis_kwargs={})
 		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Gain 10', 
-			callback=lambda: partial(
-				self.calorimeters[0].preamplifier.set, 
-				gain=10, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Gain 100', 
-			callback=lambda: partial(
-				self.calorimeters[0].preamplifier.set, 
-				gain=100, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Gain 1000', 
-			callback=lambda: partial(
-				self.calorimeters[0].preamplifier.set, 
-				gain=1000, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Preres 1kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[0].preresistor.set, 
-				resistance=1000,
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Preres 10kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[0].preresistor.set, 
-				resistance=10000, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Set Preres 100kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[0].preresistor.set, 
-				resistance=100000, 
-				)(),
+			parent=calorimeter_window_1,
+			label='Assign Calibration', 
+			callback=self.calorimeters[0].calibration.open_calibration_data_dialog,
+			user_data={'plot': self.calibration_plot_1}
 			)
 
 		self.calorimeters[0].preresistor.get(callback=self.preresistor_indicator_1.set_value)
@@ -148,7 +189,7 @@ class CpExperiment:
 
 		""" Calorimeter window 2
 		"""
-		calorimeter_window_2 = gui.add_window(label='Calorimeter B', pos=(600, 0), width=300)
+		calorimeter_window_2 = gui.add_window(label='Calorimeter B', pos=(1250, 0), width=300)
 		self.live_voltage_plot_2 = Plot.add_to_parent(calorimeter_window_2, height=200, width=-1, yaxis_kwargs={})
 		self.preresistor_indicator_2 = IntegerIndicator.add_to_parent(calorimeter_window_2, 'Preresistor', 1000, unit='Ohms')
 		self.excitation_indicator_2 = DecimalIndicator.add_to_parent(calorimeter_window_2, 'Excitation', 0, unit='V')
@@ -166,81 +207,100 @@ class CpExperiment:
 		self.calorimeters[1]._voltage_callback = self.mean_voltage_indicator_2.set_value
 		self.calorimeters[1]._resistance_callback = self.resistance_indicator_2.set_value
 
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Gain 1', 
-			callback=lambda: partial(
-				self.calorimeters[1].preamplifier.set, 
-				gain=1, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Gain 10', 
-			callback=lambda: partial(
-				self.calorimeters[1].preamplifier.set, 
-				gain=10, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Gain 100', 
-			callback=lambda: partial(
-				self.calorimeters[1].preamplifier.set, 
-				gain=100, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Gain 1000', 
-			callback=lambda: partial(
-				self.calorimeters[1].preamplifier.set, 
-				gain=1000, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Preres 1kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[1].preresistor.set, 
-				resistance=1000, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Preres 10kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[1].preresistor.set, 
-				resistance=10000, 
-				)(),
-			)
-		gui.add_button(
-			parent=calorimeter_window_2, 
-			label='Set Preres 100kOhms', 
-			callback=lambda: partial(
-				self.calorimeters[1].preresistor.set, 
-				resistance=100000, 
-				)(),
-			)
+		gui.add_separator(parent=calorimeter_window_2)
+		with gui.group(horizontal=True, parent=calorimeter_window_2):
+			gui.add_button(
+				label='1x', 
+				callback=lambda: partial(
+					self.calorimeters[1].preamplifier.set, 
+					gain=1, 
+					)(),
+				)
+			gui.add_button(
+				label='10x', 
+				callback=lambda: partial(
+					self.calorimeters[1].preamplifier.set, 
+					gain=10, 
+					)(),
+				)
+			gui.add_button(
+				label='100x', 
+				callback=lambda: partial(
+					self.calorimeters[1].preamplifier.set, 
+					gain=100, 
+					)(),
+				)
+			gui.add_button(
+				label='1000x', 
+				callback=lambda: partial(
+					self.calorimeters[1].preamplifier.set, 
+					gain=1000, 
+					)(),
+				)
 
-		self.calorimeters[1].preresistor.get(callback=self.preresistor_indicator_2.set_value)
-		self.calorimeters[1].preamplifier.get(callback=self.voltage_gain_indicator_2.set_value)
+		with gui.group(horizontal=True, parent=calorimeter_window_2):
+			gui.add_button(
+				label='1kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[1].preresistor.set, 
+					resistance=1000, 
+					)(),
+				)
+			gui.add_button(
+				label='10kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[1].preresistor.set, 
+					resistance=10000, 
+					)(),
+				)
+			gui.add_button(
+				label='100kOhms', 
+				callback=lambda: partial(
+					self.calorimeters[1].preresistor.set, 
+					resistance=100000, 
+					)(),
+				)
 
-		gui.add_button(
-			parent=calorimeter_window_1, 
-			label='Queue measure', 
-			callback=lambda: partial(
-				self.queue_measure_resistance,
-				calorimeter=0,
-				)(),
-			)
+		gui.add_separator(parent=calorimeter_window_2)
+		current_input_2 = DecimalInput.add_to_parent(calorimeter_window_2, 'Current', value=0.00, unit='mA')
 		gui.add_button(
 			parent=calorimeter_window_2, 
 			label='Queue measure', 
 			callback=lambda: partial(
 				self.queue_measure_resistance,
 				calorimeter=1,
+				current=current_input_2.value*1e-3,
 				)(),
+			)
+
+		gui.add_separator(parent=calorimeter_window_2)
+		gui.add_text('Barechip Calibration', parent=calorimeter_window_2)
+		self.calibration_plot_2 = Plot.add_to_parent(calorimeter_window_2, height=200, width=-1, yaxis_kwargs={})
+		gui.add_button(
+			parent=calorimeter_window_2,
+			label='Assign Calibration', 
+			callback=self.calorimeters[1].calibration.open_calibration_data_dialog,
+			user_data={'plot': self.calibration_plot_2}
+			)
+
+		self.calorimeters[1].preresistor.get(callback=self.preresistor_indicator_2.set_value)
+		self.calorimeters[1].preamplifier.get(callback=self.voltage_gain_indicator_2.set_value)
+
+
+
+		""" MAIN COMMANDS
+		"""
+
+		with gui.window(label='Commands', pos=(400, 0), width=300):
+
+			gui.add_button(
+				label='Make barechip calibrations',
+				callback=self.queue_make_barechip_calibration
+			)
+
+			gui.add_button(
+				label='Setup long relaxations',
+				callback=self.queue_setup_relaxations
 			)
 
 
@@ -249,12 +309,13 @@ class CpExperiment:
 		self.temperature_indicator.set_value(data['temperature'])
 		self.temperature_rate_indicator.set_value(data['rate'])
 		self.setpoint_indicator.set_value(data['setpoint'])
+		self.ramp_rate_indicator.set_value(data['ramp_rate'])
 		self.heater_range_indicator.set_value(data['heater_range'])
 		self.heater_power_indicator.set_value(data['heater_power'])
 		self.stable_indicator.set_value(data['stable'])
 
-		self.live_temperature_plot.append_series('temperature', [time.time()], [data['temperature']])
-		self.live_temperature_plot.append_series('setpoint', [time.time()], [data['setpoint']])
+		self.live_temperature_plot.append_series('temperature', [data['time']], [data['temperature']])
+		self.live_temperature_plot.append_series('setpoint', [data['time']], [data['setpoint']])
 
 
 	def update_calorimeter_indicators(self, calorimeter, data):
@@ -266,15 +327,47 @@ class CpExperiment:
 	def queue_measure_resistance(
 		self,
 		calorimeter: int,
+		current: float,
 		):
 
 		plot = self.live_voltage_plot_1 if calorimeter == 0 else self.live_voltage_plot_2
 
 		self.tasks.append(partial(
 			self.calorimeters[calorimeter].measure_resistance,
-			current=1e-4,
+			current=current,
 			plot=plot
 		))
+
+
+	def queue_stabilize_temperature(
+		self,
+		setpoint: float,
+		):
+		self.tasks.append(partial(
+			self.stage_thermometer.stabilize_temperature,
+			setpoint=setpoint,
+		))
+
+
+	def queue_ramp_temperature(
+		self,
+		setpoint: float,
+		ramp_rate: float,
+		):
+		self.tasks.append(partial(
+			self.stage_thermometer.ramp_to_temperature,
+			setpoint=setpoint,
+			ramp_rate=ramp_rate,
+		))
+
+
+	def queue_make_barechip_calibration(self):
+		make_barechip_calibrations(experiment=self)
+
+
+	def queue_setup_relaxations(self):
+		setup_relaxations(experiment=self)
+
 
 
 	""" Core asyncio methods

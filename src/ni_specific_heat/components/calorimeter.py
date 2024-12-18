@@ -4,7 +4,7 @@ import asyncio
 from loguru import logger
 from .preamplifier import Preamplifier
 from .preresistor import Preresistor
-
+from .barechip_calibration import BarechipCalibration
 
 
 
@@ -33,6 +33,8 @@ class Calorimeter:
 		self._current_callback = None
 		self._voltage_callback = None
 		self._resistance_callback = None
+
+		self._barechip_calibration = BarechipCalibration()
 
 
 	@classmethod
@@ -78,14 +80,18 @@ class Calorimeter:
 	@property
 	def preresistor(self):
 		return self._preresistor
-	
 
+
+	@property
+	def calibration(self):
+		return self._barechip_calibration
+	
 
 	def _calculate_excitation(self, current):
 		return current * self._preresistor.get() * 2.0
 
 
-	def _calculate_best_preresistor(self, current):
+	def calculate_best_preresistor(self, current):
 		if np.abs(current) <= 45e-6:
 			return 100_000
 		elif np.abs(current) <= 450e-6:
@@ -140,7 +146,7 @@ class Calorimeter:
 		or after changing to the most appropriate resistor
 		"""
 		if change_resistor:
-			res = self._calculate_best_preresistor(current)
+			res = self.calculate_best_preresistor(current)
 			self._preresistor.set(res)
 		excitation = self._calculate_excitation(current)
 		self._daq.analog_write(output_channel=self._output_channel, data=excitation)
@@ -248,7 +254,7 @@ class Calorimeter:
 		if plot is not None:
 			plot.add_scatter_series('Pos', np.linspace(0, samples, samples), x)
 		self.set_current(0, change_resistor=False)
-		await asyncio.sleep(0.1)
+		await asyncio.sleep(0.001)
 
 		self.set_current(0, change_resistor=False)
 		await asyncio.sleep(0.001)
@@ -310,6 +316,7 @@ class Calorimeter:
 		high_preresistor,
 		rate,
 		samples,
+		plot=None,
 		):
 
 		positive_rising = await self.measure_sweep_section(
@@ -322,6 +329,9 @@ class Calorimeter:
 			samples=samples,
 			)
 
+		if plot is not None:
+			plot.add_scatter_series('pos_rising', positive_rising['time'].to_numpy(), positive_rising['voltage'].to_numpy())
+
 		positive_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
 			gain=low_gain,
@@ -331,6 +341,9 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+
+		if plot is not None:
+			plot.add_scatter_series('pos_falling', positive_falling['time'].to_numpy(), positive_falling['voltage'].to_numpy())
 
 		negative_rising = await self.measure_sweep_section(
 			preresistor=high_preresistor,
@@ -342,6 +355,9 @@ class Calorimeter:
 			samples=samples,
 			)
 
+		if plot is not None:
+			plot.add_scatter_series('neg_rising', negative_rising['time'].to_numpy(), negative_rising['voltage'].to_numpy())
+
 		negative_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
 			gain=low_gain,
@@ -351,5 +367,8 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+
+		if plot is not None:
+			plot.add_scatter_series('neg_falling', negative_falling['time'].to_numpy(), negative_falling['voltage'].to_numpy())
 
 		return [positive_rising, positive_falling, negative_rising, negative_falling]

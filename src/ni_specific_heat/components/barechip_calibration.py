@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import dearpygui.dearpygui as gui
 
 
 class BarechipCalibration(object):
