@@ -4,7 +4,7 @@ import time
 from scipy.optimize import curve_fit
 from loguru import logger
 
-from pyacquisition.visa import resource_manager
+from pyacquisition.core.adapters import get_adapter
 from pyacquisition.instruments import Clock, Lakeshore_340
 from pyacquisition.instruments.lakeshore.lakeshore_340 import InputChannel, OutputChannel, State
 
@@ -14,7 +14,7 @@ class StageThermometer(object):
 
 
 	def __init__(self, GPIB, input_channel, output_channel):
-		rm = resource_manager('pyvisa')
+		rm = get_adapter('pyvisa')
 		self._lake = Lakeshore_340('lakeshore', rm.open_resource(f'GPIB0::{GPIB}::INSTR'))
 		self._input_channel = input_channel
 		self._output_channel = output_channel

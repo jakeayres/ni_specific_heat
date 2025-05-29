@@ -10,17 +10,17 @@ from functools import partial
 
 from pyacquisition.instruments.lakeshore.lakeshore_350 import InputChannel, OutputChannel
 
-from ni_specific_heat.ni6003 import Ni6003
-from ni_specific_heat.components.calorimeter import Calorimeter
-from ni_specific_heat.components.stage_thermometer import StageThermometer
-from ni_specific_heat.components.barechip_calibration import BarechipCalibration
+from src.ni_specific_heat.ni6003 import Ni6003
+from src.ni_specific_heat.components.calorimeter import Calorimeter
+from src.ni_specific_heat.components.stage_thermometer import StageThermometer
+from src.ni_specific_heat.components.barechip_calibration import BarechipCalibration
 
-from ni_specific_heat.ui.indicators import DecimalIndicator, ScientificDecimalIndicator, IntegerIndicator, BooleanIndicator
-from ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
-from ni_specific_heat.ui.plot import Plot
+from src.ni_specific_heat.ui.indicators import DecimalIndicator, ScientificDecimalIndicator, IntegerIndicator, BooleanIndicator
+from src.ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
+from src.ni_specific_heat.ui.plot import Plot
 
-from ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
-from ni_specific_heat.routines.relaxation import setup_relaxations
+from src.ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
+from src.ni_specific_heat.routines.relaxation import setup_relaxations
 
 
 class CpExperiment:
