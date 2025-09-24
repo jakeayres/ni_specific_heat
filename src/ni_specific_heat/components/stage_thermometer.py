@@ -5,8 +5,8 @@ from scipy.optimize import curve_fit
 from loguru import logger
 
 from pyacquisition.visa import resource_manager
-from pyacquisition.instruments import Clock, Lakeshore_340
-from pyacquisition.instruments.lakeshore.lakeshore_340 import InputChannel, OutputChannel, State
+from pyacquisition.instruments import Clock, Lakeshore_350
+from pyacquisition.instruments.lakeshore.lakeshore_350 import InputChannel, OutputChannel, State
 
 
 
@@ -15,7 +15,7 @@ class StageThermometer(object):
 
 	def __init__(self, GPIB, input_channel, output_channel):
 		rm = resource_manager('pyvisa')
-		self._lake = Lakeshore_340('lakeshore', rm.open_resource(f'GPIB0::{GPIB}::INSTR'))
+		self._lake = Lakeshore_350('lakeshore', rm.open_resource(f'GPIB0::{GPIB}::INSTR'))
 		self._input_channel = input_channel
 		self._output_channel = output_channel
 
@@ -30,7 +30,7 @@ class StageThermometer(object):
 	
 
 	def _tolerance(self, setpoint):
-		return 1e-3 * (5 + 0.02*setpoint + 0.0005*setpoint*setpoint)
+		return 1e-3 * (3 + 0.02*setpoint + 0.0005*setpoint*setpoint)
 
 
 	def get_temperature(self, callback=None):
@@ -81,14 +81,14 @@ class StageThermometer(object):
 
 
 	def get_heater_range(self, callback=None):
-		rng = int(self._lake._query('RANGE?'))
+		rng = int(self._lake._query('RANGE? 1'))
 		if callback is not None:
 			callback(rng)
 		return rng
 
 
 	def set_heater_range(self, rng, callback=None):
-		self._lake._command(f'RANGE {rng}')
+		self._lake._command(f'RANGE 1,{rng}')
 		if callback is not None:
 			callback(rng)
 		return rng
@@ -122,9 +122,10 @@ class StageThermometer(object):
 			return False
 
 
-	async def stabilize_temperature(self, setpoint, period=2):
+	async def stabilize_temperature(self, setpoint, ramp_rate=1, period=2):
 		""" Wait for temperature stability at setpoint """
 		logger.info(f'Stabilizing {setpoint:.2f} K. (Tol {self._tolerance(setpoint)})')
+		self.set_ramp_rate(ramp_rate)
 		self.set_setpoint(setpoint)
 		while self.stable is False:
 			await asyncio.sleep(period)

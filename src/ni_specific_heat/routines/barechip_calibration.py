@@ -10,6 +10,20 @@ from ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
 from ni_specific_heat.ui.plot import Plot
 
 
+async def set_setpoint_to_current_temperature(experiment):
+	temperature = experiment.stage_thermometer.get_temperature()
+	ramp_rate = experiment.stage_thermometer.get_ramp_rate()
+
+	experiment.stage_thermometer.set_ramp_rate(0)
+	await asyncio.sleep(0.010)
+	experiment.stage_thermometer.set_setpoint(temperature)
+	await asyncio.sleep(0.010)
+	experiment.stage_thermometer.set_ramp_rate(ramp_rate)
+
+	return 0
+
+
+
 async def measure_datapoint(
 	experiment,
 	file_stem,
@@ -32,21 +46,54 @@ async def measure_datapoint(
 	plot.add_series(f'A', [], [])
 	plot.add_series(f'B', [], [])
 
+	gain_1 = 1
+	gain_2 = 1
+
+	await set_setpoint_to_current_temperature(experiment)
+
 	for setpoint in temperatures:
 
-		await experiment.stage_thermometer.stabilize_temperature(setpoint)
+		if setpoint < 3.0:
+			experiment.stage_thermometer.set_heater_range(2)
+		elif setpoint < 10.0:
+			experiment.stage_thermometer.set_heater_range(3)
+		elif setpoint < 20.0:
+			experiment.stage_thermometer.set_heater_range(4)
+
+		await experiment.stage_thermometer.stabilize_temperature(setpoint=setpoint, ramp_rate=1)
+		await asyncio.sleep(60)
 
 		for current in currents:
 			logger.info(f'Calibrating at {setpoint}K and {current*1e6}uA')
+
+			# Set best preresistor
+			preresistor_1 = experiment.calorimeters[0].calculate_best_preresistor(current)
+			preresistor_2 = experiment.calorimeters[1].calculate_best_preresistor(current)	
 
 			for i in range(repeats):
 
 				data_1 = await experiment.calorimeters[0].measure_resistance(
 					current=current,
+					gain=gain_1,
+					preresistor=preresistor_1,
 					)
 				data_2 = await experiment.calorimeters[1].measure_resistance(
 					current=current,
+					gain=gain_2,
+					preresistor=preresistor_2,
 					)
+
+				# Autorange the gain
+				if data_1['voltage'] < 0.5:
+					gain_1 = min(gain_1 * 10, 1000) 
+				elif data_1['voltage'] > 8.0:
+					gain_1 = max(gain_1 / 10, 1)
+
+				if data_2['voltage'] < 0.5:
+					gain_2 = min(gain_2 * 10, 1000) 
+				elif data_2['voltage'] > 8.0:
+					gain_2 = max(gain_2 / 10, 1)
+
 				plot.append_series(f'A', [current], [data_1['resistance']])
 				plot.append_series(f'B', [current], [data_2['resistance']])
 

@@ -20,7 +20,7 @@ from ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
 from ni_specific_heat.ui.plot import Plot
 
 from ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
-from ni_specific_heat.routines.relaxation import setup_relaxations
+from ni_specific_heat.routines.relaxation import setup_relaxations, setup_single_relaxation
 
 
 class CpExperiment:
@@ -164,6 +164,8 @@ class CpExperiment:
 
 		gui.add_separator(parent=calorimeter_window_1)
 		current_input_1 = DecimalInput.add_to_parent(calorimeter_window_1, 'Current', value=0.00, unit='mA')
+		measure_samples_input_1 = IntegerInput.add_to_parent(calorimeter_window_1, 'Samples', value=50000)
+		measure_time_input_1 = DecimalInput.add_to_parent(calorimeter_window_1, 'Time', value=1.00, unit='s')
 		gui.add_button(
 			parent=calorimeter_window_1, 
 			label='Queue measure', 
@@ -171,6 +173,8 @@ class CpExperiment:
 				self.queue_measure_resistance,
 				calorimeter=0,
 				current=current_input_1.value*1e-3,
+				time=measure_time_input_1.value,
+				samples=measure_samples_input_1.value,
 				)(),
 			)
 
@@ -263,6 +267,8 @@ class CpExperiment:
 
 		gui.add_separator(parent=calorimeter_window_2)
 		current_input_2 = DecimalInput.add_to_parent(calorimeter_window_2, 'Current', value=0.00, unit='mA')
+		measure_samples_input_2 = IntegerInput.add_to_parent(calorimeter_window_2, 'Samples', value=50000)
+		measure_time_input_2 = DecimalInput.add_to_parent(calorimeter_window_2, 'Time', value=1.00, unit='s')
 		gui.add_button(
 			parent=calorimeter_window_2, 
 			label='Queue measure', 
@@ -270,6 +276,8 @@ class CpExperiment:
 				self.queue_measure_resistance,
 				calorimeter=1,
 				current=current_input_2.value*1e-3,
+				time=measure_time_input_2.value,
+				samples=measure_samples_input_2.value,
 				)(),
 			)
 
@@ -286,8 +294,6 @@ class CpExperiment:
 		self.calorimeters[1].preresistor.get(callback=self.preresistor_indicator_2.set_value)
 		self.calorimeters[1].preamplifier.get(callback=self.voltage_gain_indicator_2.set_value)
 
-
-
 		""" MAIN COMMANDS
 		"""
 
@@ -295,12 +301,17 @@ class CpExperiment:
 
 			gui.add_button(
 				label='Make barechip calibrations',
-				callback=self.queue_make_barechip_calibration
+				callback=self.queue_make_barechip_calibration,
+			)
+
+			gui.add_button(
+				label='Single Relaxation',
+				callback=self.queue_single_relaxation,
 			)
 
 			gui.add_button(
 				label='Setup long relaxations',
-				callback=self.queue_setup_relaxations
+				callback=self.queue_setup_relaxations,
 			)
 
 
@@ -328,14 +339,19 @@ class CpExperiment:
 		self,
 		calorimeter: int,
 		current: float,
+		time: float,
+		samples: int,
 		):
 
 		plot = self.live_voltage_plot_1 if calorimeter == 0 else self.live_voltage_plot_2
+		rate=int(samples/time)
 
 		self.tasks.append(partial(
 			self.calorimeters[calorimeter].measure_resistance,
 			current=current,
-			plot=plot
+			plot=plot,
+			rate=rate,
+			samples=samples,
 		))
 
 
@@ -364,6 +380,10 @@ class CpExperiment:
 	def queue_make_barechip_calibration(self):
 		make_barechip_calibrations(experiment=self)
 
+
+	def queue_single_relaxation(self):
+		setup_single_relaxation(experiment=self)
+			
 
 	def queue_setup_relaxations(self):
 		setup_relaxations(experiment=self)

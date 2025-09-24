@@ -52,6 +52,7 @@ def calculate_preamplifier_gain(current, temperature, calorimeter):
 
 
 
+
 async def perform_relaxations(
 	experiment,
 	file_stem,
@@ -74,24 +75,129 @@ async def perform_relaxations(
 		low_preresistor = experiment.calorimeters[0].calculate_best_preresistor(low_current)
 		low_gain = calculate_preamplifier_gain(low_current, temperature, experiment.calorimeters[0])
 
-		high_current = 1e-3
+		high_current = 1e-4
 		high_preresistor = experiment.calorimeters[0].calculate_best_preresistor(high_current)
 		high_gain = calculate_preamplifier_gain(high_current, temperature, experiment.calorimeters[0])
 
 		logger.info(f'{low_current}, {low_preresistor}, {low_gain}')
 
+		# positive_rising, positive_falling, negative_rising, negative_falling = await experiment.calorimeters[0].measure_sweep(
+		# 	low_current=low_current, 
+		# 	low_gain=low_gain, 
+		# 	low_preresistor=low_preresistor,
+		# 	high_current=high_current,
+		# 	high_gain=high_gain,
+		# 	high_preresistor=high_preresistor,
+		# 	rate=90_000,
+		# 	samples=90_000,
+		# 	plot=plot,
+		# )
+
 		positive_rising, positive_falling, negative_rising, negative_falling = await experiment.calorimeters[0].measure_sweep(
-			low_current=low_current, 
-			low_gain=1, 
-			low_preresistor=1000,
-			high_current=high_current,
-			high_gain=1,
-			high_preresistor=1000,
-			rate=20_000,
-			samples=90_000,
+			low_current=10e-6, 
+			low_gain=10, 
+			low_preresistor=100_000,
+			high_current=50e-6,
+			high_gain=10,
+			high_preresistor=100_000,
+			rate=90_000,
+			samples=10_000,
 			plot=plot,
 		)
 
+
+async def perform_relaxation(
+	experiment,
+	calorimeter_N,
+	file_stem,
+	low_current,
+	high_current,
+	samples,
+	rate,
+	repeats,
+	plot,
+	):
+	logger.info('Performing single relaxation')
+
+	calorimeter = experiment.calorimeters[calorimeter_N]
+	preresistor = calorimeter.preresistor.get()
+	gain = calorimeter.preamplifier.get()
+
+	for i in range(repeats):
+
+		positive_rising, positive_falling, negative_rising, negative_falling = await calorimeter.measure_sweep(
+			low_current=low_current, 
+			low_gain=gain, 
+			low_preresistor=preresistor,
+			high_current=high_current,
+			high_gain=gain,
+			high_preresistor=preresistor,
+			rate=rate,
+			samples=samples,
+			plot=plot,
+		)
+
+		# Save data
+		positive_rising.to_csv(f'C://Data/{file_stem}_n_{i}_calorimeter_{calorimeter_N}_positive_rising.dat', index=False)
+		positive_falling.to_csv(f'C://Data/{file_stem}_n_{i}_calorimeter_{calorimeter_N}_positive_falling.dat', index=False)
+		negative_rising.to_csv(f'C://Data/{file_stem}_n_{i}_calorimeter_{calorimeter_N}_negative_rising.dat', index=False)
+		negative_falling.to_csv(f'C://Data/{file_stem}_n_{i}_calorimeter_{calorimeter_N}_negative_falling.dat', index=False)
+
+		averaged_up = pd.DataFrame(data={
+			'time': (positive_rising['time']+negative_rising['time']) / 2,
+			'voltage': np.abs((positive_rising['voltage']+negative_rising['voltage']) / 2),
+			'resistance': np.abs((positive_rising['resistance']+negative_rising['resistance']) / 2),
+			})
+
+		plot.add_scatter_series('avg_rising', averaged_up['time'].to_numpy(), averaged_up['resistance'].to_numpy())
+
+		averaged_down = pd.DataFrame(data={
+			'time': (positive_falling['time']+negative_falling['time']) / 2,
+			'voltage': np.abs((positive_falling['voltage']+negative_falling['voltage']) / 2),
+			'resistance': np.abs((positive_falling['resistance']+negative_falling['resistance']) / 2),
+			})
+
+		plot.add_scatter_series('avg_falling', averaged_down['time'].to_numpy(), averaged_down['resistance'].to_numpy())
+
+
+def setup_single_relaxation(
+	experiment,
+	):
+
+	window = gui.add_window(label='Perform Single Relaxation', pos=(550, 150), width=550)
+	main_plot = Plot.add_to_parent(window, height=400, width=-1)
+
+	columns = gui.add_group(parent=window, horizontal=True, horizontal_spacing=75, width=125)
+	left = gui.add_group(parent=columns, width=200)
+	right = gui.add_group(parent=columns, width=200)
+
+	calorimeter_N = IntegerInput.add_to_parent(left, 'Calorimeter N', value=0, unit='0/1')
+	low_current = DecimalInput.add_to_parent(left, 'Low current', value=0.010, unit='mA')
+	high_current = DecimalInput.add_to_parent(left, 'High current', value=0.025, unit='mA')
+
+	samples = IntegerInput.add_to_parent(right, 'Samples', value=50000)
+	rate = IntegerInput.add_to_parent(right, 'Rate', value=50000, unit='Hz')
+	repeats = IntegerInput.add_to_parent(right, 'Repeats', value=5)
+
+	file_stem = StringInput.add_to_parent(window, 'File stem', value='single_relaxation')
+
+	gui.add_button(
+		parent=window,
+		label='Start relaxation', 
+		callback=lambda: experiment.tasks.append(
+			partial(
+				perform_relaxation,
+				experiment=experiment,
+				calorimeter_N=calorimeter_N.value,
+				file_stem=file_stem.value,
+				low_current=low_current.value * 1e-3,
+				high_current=high_current.value * 1e-3,
+				samples=samples.value,
+				rate=rate.value,
+				repeats=repeats.value,
+				plot=main_plot,
+			)),
+		)
 
 
 def setup_relaxations(

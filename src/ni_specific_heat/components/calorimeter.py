@@ -164,6 +164,11 @@ class Calorimeter:
 				}
 			)
 
+		return {
+			'excitation': excitation,
+			'current': current,
+		}
+
 
 	def _write_and_measure(
 		self,
@@ -233,8 +238,8 @@ class Calorimeter:
 		current: float = 0.1e-3,
 		preresistor: int = None,
 		gain: int = None,
-		samples: int = 10000,
-		rate: int = 90000,
+		samples: int = 75000,
+		rate: int = 75000,
 		plot = None,
 		):
 
@@ -250,7 +255,7 @@ class Calorimeter:
 		self.preresistor.set(preresistor)
 		self.set_current(current, change_resistor=False)
 		await asyncio.sleep(0.001)
-		x = self.measure_voltage(10000, 90000)
+		x = self.measure_voltage(samples=samples, rate=rate)
 		if plot is not None:
 			plot.add_scatter_series('Pos', np.linspace(0, samples, samples), x)
 		self.set_current(0, change_resistor=False)
@@ -261,16 +266,16 @@ class Calorimeter:
 		self.preresistor.set(preresistor)
 		self.set_current(-current, change_resistor=False)
 		await asyncio.sleep(0.001)
-		y = self.measure_voltage(10000, 90000)
+		y = self.measure_voltage(samples=samples, rate=rate)
 		if plot is not None:
 			plot.add_scatter_series('Neg', np.linspace(0, samples, samples), y)
 		self.set_current(0, change_resistor=False)
 		await asyncio.sleep(0.001)
 
-		voltage = (np.mean(x) - np.mean(y)) / 2.0
+		voltage = np.abs((np.mean(x) - np.mean(y)) / 2.0)
 		if self._voltage_callback is not None:
 			self._voltage_callback(voltage)
-		resistance = voltage/current/gain
+		resistance = np.abs(voltage/current/gain)
 		if self._resistance_callback is not None:
 			self._resistance_callback(resistance)
 		logger.info(f'{self._name}: V={voltage}, R={resistance}')
@@ -285,7 +290,8 @@ class Calorimeter:
 		measure_current, 
 		end_current, 
 		rate, 
-		samples
+		samples,
+		plot=None,
 		):
 
 		self.set_current(0, change_resistor=False)
@@ -303,6 +309,19 @@ class Calorimeter:
 
 		self.set_current(end_current, change_resistor=False)
 
+		if plot is not None:
+			plot.add_scatter_series('pos_rising', df['time'].to_numpy(), df['voltage'].to_numpy())
+
+		return df
+
+
+	def add_resistance_column(self, df):
+		df['resistance'] = np.abs(df['voltage']/df['current']/df['gain'])
+		return df
+
+
+	def add_temperature_column(self, df):
+		df['temperature'] = self.calibration.evaluate_temperature(df['resistance'])
 		return df
 
 
@@ -319,6 +338,8 @@ class Calorimeter:
 		plot=None,
 		):
 
+		logger.debug('Measuring sweep.')
+
 		positive_rising = await self.measure_sweep_section(
 			preresistor=high_preresistor,
 			gain=high_gain,
@@ -328,9 +349,11 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+		positive_rising = self.add_resistance_column(positive_rising)
+		#positive_rising = self.add_temperature_column(positive_rising)
 
 		if plot is not None:
-			plot.add_scatter_series('pos_rising', positive_rising['time'].to_numpy(), positive_rising['voltage'].to_numpy())
+			plot.add_line_series('pos_rising', positive_rising['time'].to_numpy(), positive_rising['resistance'].to_numpy())
 
 		positive_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
@@ -341,9 +364,11 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+		positive_falling = self.add_resistance_column(positive_falling)
+		#positive_falling = self.add_temperature_column(positive_falling)
 
 		if plot is not None:
-			plot.add_scatter_series('pos_falling', positive_falling['time'].to_numpy(), positive_falling['voltage'].to_numpy())
+			plot.add_line_series('pos_falling', positive_falling['time'].to_numpy(), positive_falling['resistance'].to_numpy())
 
 		negative_rising = await self.measure_sweep_section(
 			preresistor=high_preresistor,
@@ -354,9 +379,11 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+		negative_rising = self.add_resistance_column(negative_rising)
+		#negative_rising = self.add_temperature_column(negative_rising)
 
 		if plot is not None:
-			plot.add_scatter_series('neg_rising', negative_rising['time'].to_numpy(), negative_rising['voltage'].to_numpy())
+			plot.add_line_series('neg_rising', negative_rising['time'].to_numpy(), negative_rising['resistance'].to_numpy())
 
 		negative_falling = await self.measure_sweep_section(
 			preresistor=low_preresistor,
@@ -367,8 +394,10 @@ class Calorimeter:
 			rate=rate,
 			samples=samples,
 			)
+		negative_falling = self.add_resistance_column(negative_falling)
+		#negative_falling = self.add_temperature_column(negative_falling)
 
 		if plot is not None:
-			plot.add_scatter_series('neg_falling', negative_falling['time'].to_numpy(), negative_falling['voltage'].to_numpy())
+			plot.add_line_series('neg_falling', negative_falling['time'].to_numpy(), negative_falling['resistance'].to_numpy())
 
 		return [positive_rising, positive_falling, negative_rising, negative_falling]

@@ -16,7 +16,9 @@ class Ni6003:
 	def __init__(self, device_number:int=1):
 
 		system = nidaqmx.system.System.local()
+		logger.debug('Loading Ni6003')
 		self._device = system.devices[self._device_handle(device_number)]
+		logger.debug('Device found')
 
 		self.analog_inputs = self._initialize_analog_inputs()
 		self.analog_outputs = self._initialize_analog_outputs()
@@ -51,6 +53,11 @@ class Ni6003:
 
 
 	def analog_read(self, input_channel, samples, rate):
+
+		if rate > 99999:
+			rate = 100000
+			logger.warning('Maximum rate exceeded. Rate set to 100kHz')
+		
 		with nidaqmx.Task() as task:
 			self.analog_inputs[input_channel].add_to_task(task)
 			task.timing.cfg_samp_clk_timing(rate, samps_per_chan=samples)
