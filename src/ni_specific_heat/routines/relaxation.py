@@ -5,9 +5,9 @@ from loguru import logger
 from functools import partial
 import dearpygui.dearpygui as gui
 
-from ni_specific_heat.ui.indicators import DecimalIndicator, ScientificDecimalIndicator, IntegerIndicator, BooleanIndicator
-from ni_specific_heat.ui.inputs import DecimalInput, IntegerInput, StringInput
-from ni_specific_heat.ui.plot import Plot
+from ..ui.indicators import DecimalIndicator, ScientificDecimalIndicator, IntegerIndicator, BooleanIndicator
+from ..ui.inputs import DecimalInput, IntegerInput, StringInput
+from ..ui.plot import Plot
 
 
 def calculate_low_current(temperature):

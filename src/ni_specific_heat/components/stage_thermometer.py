@@ -41,7 +41,7 @@ class StageThermometer(object):
 
 
 	def get_resistance(self, callback=None):
-		resistance = float(self._lake._query(f'SRDG? {self._input_channel.value}'))
+		resistance = float(self._lake.query(f'SRDG? {self._input_channel.value}'))
 		if callback is not None:
 			callback(resistance)
 		return resistance
@@ -102,7 +102,7 @@ class StageThermometer(object):
 
 
 	def get_heater_power(self, callback=None):
-		power = float(self._lake._query('HTR?'))
+		power = float(self._lake.query('HTR?'))
 		if callback is not None:
 			callback(power)
 		return power

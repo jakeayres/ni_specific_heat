@@ -1,18 +1,15 @@
-[tool.poetry]
-name = "ni_specific_heat"
-version = "0.0.1"
-description = "Driver for Ni6003 specific heat apparatus"
-authors = ["Jake Ayres <jake_ayres@hotmail.co.uk>"]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-nidaqmx = "^0.9.0"
-loguru = "^0.7.2"
-pandas = "^2.0.3"
-
-[tool.poetry.dev-dependencies]
-pytest = "^6.2.2"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[project]
+name = "ni-specific-heat"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dearpygui>=2.0.0",
+    "loguru>=0.7.3",
+    "matplotlib>=3.10.3",
+    "nidaqmx>=1.1.0",
+    "pandas>=2.2.3",
+    "pyacquisition>=0.1.5",
+    "scipy>=1.15.3",
+]
