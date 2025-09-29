@@ -1,7 +1,7 @@
 from loguru import logger
 import numpy as np
 import pandas as pd
-import time
+import time, sys
 import json
 import matplotlib.pyplot as plt
 import asyncio
@@ -24,11 +24,17 @@ from src.ni_specific_heat.routines.barechip_calibration import make_barechip_cal
 from src.ni_specific_heat.routines.relaxation import setup_relaxations, setup_single_relaxation
 
 
+logger.remove()  # remove default handler
+logger.add(sys.stdout, level="DEBUG")
+print('test')
+
+
 class CpExperiment:
 
 
 	def __init__(self):
 
+		logger.info('TEST')
 		self.calorimeters = self._load_calorimeters('calorimeter_config.json')
 		self.calibrations = [BarechipCalibration(), BarechipCalibration()]
 		self.stage_thermometer = StageThermometer(GPIB=2, input_channel=InputChannel.INPUT_A, output_channel=OutputChannel.OUTPUT_1)

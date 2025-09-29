@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [[package]]
@@ -366,6 +366,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/c3/0fc2c97dea550df9afd072a37c1e95421652e3206bbeaa02378b24c2b480/frozenlist-1.6.0-cp313-cp313t-win32.whl", hash = "sha256:a4d96dc5bcdbd834ec6b0f91027817214216b5b30316494d2b1aebffb87c534f", size = 128797, upload-time = "2025-04-17T22:38:14.013Z" },
     { url = "https://files.pythonhosted.org/packages/ae/f5/79c9320c5656b1965634fe4be9c82b12a3305bdbc58ad9cb941131107b20/frozenlist-1.6.0-cp313-cp313t-win_amd64.whl", hash = "sha256:e18036cb4caa17ea151fd5f3d70be9d354c99eb8cf817a3ccde8a7873b074348", size = 134709, upload-time = "2025-04-17T22:38:15.551Z" },
     { url = "https://files.pythonhosted.org/packages/71/3e/b04a0adda73bd52b390d730071c0d577073d3d26740ee1bad25c3ad0f37b/frozenlist-1.6.0-py3-none-any.whl", hash = "sha256:535eec9987adb04701266b92745d6cdcef2e77669299359c3009c3404dd5d191", size = 12404, upload-time = "2025-04-17T22:38:51.668Z" },
+]
+
+[[package]]
+name = "fsspec"
+version = "2025.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/e0/bab50af11c2d75c9c4a2a26a5254573c0bd97cea152254401510950486fa/fsspec-2025.9.0.tar.gz", hash = "sha256:19fd429483d25d28b65ec68f9f4adc16c17ea2c7c7bf54ec61360d478fb19c19", size = 304847, upload-time = "2025-09-02T19:10:49.215Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl", hash = "sha256:530dc2a2af60a414a832059574df4a6e10cce927f6f4a78209390fe38955cfb7", size = 199289, upload-time = "2025-09-02T19:10:47.708Z" },
 ]
 
 [[package]]
@@ -797,6 +806,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "dearpygui" },
+    { name = "fsspec" },
     { name = "loguru" },
     { name = "matplotlib" },
     { name = "nidaqmx" },
@@ -808,6 +818,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dearpygui", specifier = ">=2.0.0" },
+    { name = "fsspec", specifier = ">=2025.9.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "nidaqmx", specifier = ">=1.1.0" },
@@ -825,7 +836,7 @@ dependencies = [
     { name = "deprecation" },
     { name = "distro", marker = "sys_platform == 'linux'" },
     { name = "hightime" },
-    { name = "numpy", marker = "python_full_version < '4.0'" },
+    { name = "numpy", marker = "python_full_version < '4'" },
     { name = "python-decouple" },
     { name = "requests" },
     { name = "tzlocal" },

@@ -4,7 +4,7 @@ import time
 from scipy.optimize import curve_fit
 from loguru import logger
 
-from pyacquisition.visa import resource_manager
+from pyacquisition.core.adapters import get_adapter
 from pyacquisition.instruments import Clock, Lakeshore_350
 from pyacquisition.instruments.lakeshore.lakeshore_350 import InputChannel, OutputChannel, State
 
@@ -14,7 +14,8 @@ class StageThermometer(object):
 
 
 	def __init__(self, GPIB, input_channel, output_channel):
-		rm = resource_manager('pyvisa')
+
+		rm = get_adapter('pyvisa')
 		self._lake = Lakeshore_350('lakeshore', rm.open_resource(f'GPIB0::{GPIB}::INSTR'))
 		self._input_channel = input_channel
 		self._output_channel = output_channel
@@ -81,21 +82,21 @@ class StageThermometer(object):
 
 
 	def get_heater_range(self, callback=None):
-		rng = int(self._lake._query('RANGE? 1'))
+		rng = int(self._lake.query('RANGE? 1'))
 		if callback is not None:
 			callback(rng)
 		return rng
 
 
 	def set_heater_range(self, rng, callback=None):
-		self._lake._command(f'RANGE 1,{rng}')
+		self._lake.command(f'RANGE 1,{rng}')
 		if callback is not None:
 			callback(rng)
 		return rng
 
 
 	def set_heater_off(self, callback=None):
-		self._lake._command('RANGE 0')
+		self._lake.command('RANGE 0')
 		if callback is not None:
 			callback(0)
 		return 0
