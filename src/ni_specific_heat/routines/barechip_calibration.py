@@ -37,6 +37,8 @@ async def measure_datapoint(
 	plot,
 	):
 
+	logger.debug('Starting calibration')
+
 	df_1 = pd.DataFrame(data={'setpoint': [], 'temperature': [], 'resistance': [], 'current': []})
 	df_2 = pd.DataFrame(data={'setpoint': [], 'temperature': [], 'resistance': [], 'current': []})
 	temperatures = np.geomspace(minimum_temperature, maximum_temperature, temperature_steps)
