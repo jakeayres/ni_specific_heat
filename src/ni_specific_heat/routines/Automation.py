@@ -1,12 +1,9 @@
 import numpy as np
 import scipy.integrate as integrate
-from Auto_calibration_R import R_interpolate
 import pandas as pd
 import csv
 import scipy.interpolate as interpolate
 import scipy.optimize
-import relaxation
-import CpExperiment
 
 
 T_min = np.array([1.5,2.3,2.8,3.2,3.8,4.5,5.5,6.5,7.6,9.25])
@@ -17,14 +14,6 @@ R = np.ones(N_sweeps)
 
 def abs_min():
     return 1.5
-
-def kappa(x,a,b):
-    return a+b
-
-a=1
-b=0
-
-experiment = CpExperiment()
 
 x_par = np.arange(0.1,5.1,0.1)
 
@@ -82,7 +71,7 @@ class Relaxation_parameters:
         self.est_temps = np.linspace(self.T_min[0],self.T_max[-1],num_estimations)
         I_test = Relaxation_parameters(T_min,T_max,R,a,b).generate_test_currents(self.est_temps,num_estimations)
         for n in range(num_estimations):
-            relaxation.perform_relaxation(
+            perform_relaxation(
 	            experiment,
 	            calorimeter_N,
                 file_stem,

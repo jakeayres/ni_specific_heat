@@ -21,7 +21,7 @@ from src.ni_specific_heat.ui.plot import Plot
 
 
 from src.ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
-from src.ni_specific_heat.routines.relaxation import setup_relaxations, setup_single_relaxation
+from src.ni_specific_heat.routines.relaxation import setup_relaxations, setup_single_relaxation, setup_automated_relaxation
 
 
 logger.remove()  # remove default handler
@@ -321,6 +321,11 @@ class CpExperiment:
 				callback=self.queue_setup_relaxations,
 			)
 
+			gui.add_button(
+				label='Automated Relaxations',
+				callback=self.queue_setup_automated_relaxation,
+			)
+
 
 
 	def update_stage_indicators(self, data):
@@ -394,6 +399,9 @@ class CpExperiment:
 
 	def queue_setup_relaxations(self):
 		setup_relaxations(experiment=self)
+
+	def queue_setup_automated_relaxation(self):
+		setup_automated_relaxation(experiment=self)
 
 
 

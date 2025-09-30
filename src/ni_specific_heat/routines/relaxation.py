@@ -4,11 +4,11 @@ import pandas as pd
 from loguru import logger
 from functools import partial
 import dearpygui.dearpygui as gui
+from scipy import integrate, interpolate, optimize
 
 from ..ui.indicators import DecimalIndicator, ScientificDecimalIndicator, IntegerIndicator, BooleanIndicator
 from ..ui.inputs import DecimalInput, IntegerInput, StringInput
 from ..ui.plot import Plot
-
 
 def calculate_low_current(temperature):
 	return 1e-6 * (10 + 0.1*temperature + 0.0005*temperature*temperature)
@@ -236,3 +236,164 @@ def setup_relaxations(
 				plot=main_plot,
 			)),
 		)
+	
+def Perform_Automated_Relaxation(experiment, calorimeter_N, file_stem, min_temp, max_temp, plot):
+	min_temps =[min_temp]
+	max_temps =[min_temp*1.2]
+	while max_temps[-1]<(max_temp):
+		min_temps.append(np.round(min_temps[-1]*1.1,2))
+		max_temps.append(np.round(min_temps[-1]*1.2,2))
+	
+	min_temps = np.array([min_temps])
+	max_temps = np.array([max_temps])
+	num_sweeps = len(min_temps)
+	print(min_temps)
+	print(max_temps)
+
+	relaxation_time_prediction = pd.read_csv('automation_csv/relaxation_time_prediction')   # NEED TO MAKE THIS CSV
+	samples = relaxation_time_prediction[0]
+	rate = relaxation_time_prediction[1]
+	kappa = pd.read_csv('automation_csv/Thermal_conductance')
+	Resistance_values = R_interpolate(max_temps)
+	Relaxation_parameters(min_temps,max_temps,Resistance_values,kappa)
+	repeats = Relaxation_parameters().generate_repeats(min_temps)
+	I = Relaxation_parameters().generate_currents()
+
+	for i in range(num_sweeps):
+	    perform_relaxation(
+	            experiment,
+	            calorimeter_N,
+	            file_stem,
+                I[0,i],
+                I[1,i],
+                samples[i],
+                rate[i],
+                repeats[i],
+                plot)
+
+def setup_automated_relaxation(
+	experiment,
+	):
+
+	window = gui.add_window(label='Perform Automated Relaxation Sweeps', pos=(550, 150), width=550)
+	main_plot = Plot.add_to_parent(window, height=400, width=-1)
+
+	columns = gui.add_group(parent=window, horizontal=True, horizontal_spacing=75, width=125)
+	left = gui.add_group(parent=columns, width=200)
+	right = gui.add_group(parent=columns, width=200)
+
+	calorimeter_N = IntegerInput.add_to_parent(left, 'Calorimeter N', value=0, unit='0/1')
+	min_temp = DecimalInput.add_to_parent(left, 'Minimum Temperature', value=1.5, unit='K')
+	max_temp = DecimalInput.add_to_parent(left, 'Maximum Temperature', value=30, unit='K')
+	
+	file_stem = StringInput.add_to_parent(window, 'File stem', value='Relaxations')
+
+	gui.add_button(
+		parent=window,
+		label='Start Relaxation', 
+		callback=lambda: experiment.tasks.append(
+			partial(
+				Perform_Automated_Relaxation,
+				experiment=experiment,
+				calorimeter_N=calorimeter_N.value,
+				file_stem=file_stem.value,
+				min_temp=min_temp.value,
+				max_temp=max_temp.value,
+				plot=main_plot,
+			)),
+		)
+	
+
+kappa = [[0,1,2,3,4],[0,1,2,3,4]]
+
+def R_interpolate(T_max):
+    R_array = pd.read_csv(f'automation_csv/calibration.csv')
+    interpolation = interpolate.make_interp_spline(R_array[0], R_array[1])
+    R = interpolation(T_max)
+    return R
+
+class Relaxation_parameters:
+
+    def  __init__(self,T_min,T_max,R,kappa):
+        self.T_max = T_max
+        self.T_min = T_min
+        self.R = R
+        self.I_max = np.empty(len(self.T_min))
+        self.I_min = np.empty(len(self.T_min))
+
+    def generate_test_currents(self,est_temps,num_estimations):
+        max_est_temps = est_temps*1.25
+        self.test_I_max = np.empty(num_estimations)
+        self.test_I_min = np.empty(num_estimations)
+        for i in range(num_estimations):
+            kappa_mask = (kappa[0] >= est_temps[i]) and (kappa[0] <= max_est_temps[i])
+            new_kappa = np.array(kappa[0,kappa_mask],kappa[1,kappa_mask])
+            self.test_I_min[i] = 0.05
+            self.test_I_max[i] = np.sqrt(integrate.simps(new_kappa[1], new_kappa[0])[0]/self.R[i]) + self.test_I_min
+        
+        return np.array([self.test_I_min,self.test_I_max])
+
+    def generate_currents(self):
+        T_min_roll = np.roll(self.T_min,-1)
+        N_sweeps = len(self.T_min)
+        T_minmax = np.empty(N_sweeps)
+        for i in range(N_sweeps):
+            min_kappa_mask = (kappa[0] >= self.T_min[i]) and (kappa[0] <= self.T_min[i]+T_minmax[i])
+            new_min_kappa = np.array(kappa[0,min_kappa_mask],kappa[1,min_kappa_mask])
+            max_kappa_mask = (kappa[0] >= self.T_min[i]) and (kappa[0] <= self.T_max[i])
+            new_max_kappa = np.array(kappa[0,max_kappa_mask],kappa[1,max_kappa_mask])
+            T_minmax[i] = (self.T_max[i] - T_min_roll[i])/4
+            T_minmax[-1] = T_minmax[-2]
+            self.I_min[i] = np.sqrt(integrate.simps(new_min_kappa[1], new_min_kappa[0])[0]/self.R[i])
+            self.I_max[i] = np.sqrt(integrate.simps(new_max_kappa[1], new_max_kappa[0])[0]/self.R[i]) + self.I_min[i]
+        
+        #I = np.array([I_max,I_min])
+
+        return np.array([self.I_min,self.I_max])
+    
+    def test_for_C(self,num_estimations,calorimeter_N,file_stem,samples,rate,repeats):
+        self.est_temps = np.linspace(self.T_min[0],self.T_max[-1],num_estimations)
+        I_test = Relaxation_parameters(T_min,T_max,R,a,b).generate_test_currents(self.est_temps,num_estimations)
+        for n in range(num_estimations):
+            perform_relaxation(
+	            experiment,
+	            calorimeter_N,
+                file_stem,
+                I_test[0,n],
+                I_test[1,n],
+                samples,
+                rate,
+                repeats,
+                plot)
+            
+    def test_fit(x,a,b):
+        return a*x + b*x**3
+            
+    def estimate_C(self,filepath):
+        test_data = pd.read_csv(filepath)
+        par = scipy.optimize.curve_fit(test_fit,test_data[0],test_data[1])
+
+        return par
+    
+    def estimate_relaxation_times(self, test_fit_par, T_min, T_max, kappa):
+        T_avg = (T_min + T_max)/2
+        C_est = test_fit(T_avg,test_fit_par[0],test_fit_par[1])
+        interpolation = interpolate.make_interp_spline(kappa[0],kappa[1])
+        new_kappa = interpolation(T_avg)
+        relaxation_times = 3*(C_est/new_kappa)
+        relaxation_time_array = np.ones((2,len(relaxation_times)))
+        relaxation_time_array[0] = relaxation_time_array[0]*90000
+        relaxation_time_array[1] = relaxation_time_array/relaxation_times
+        pd.DataFrame(relaxation_time_array, columns=2)
+        pd.DataFrame.to_csv('automation_csv/relaxation_time_prediction.csv')
+
+        return None
+    
+    def generate_repeats(self,T_min):
+        repeats =[]
+        for i in range(len(T_min)):
+            if T_min[i] < 12:
+                repeats.append(5)
+            else:
+                repeats.append(8)
+        return repeats
