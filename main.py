@@ -409,7 +409,7 @@ class CpExperiment:
 		setup_automated_relaxation(experiment=self)
 
 	def queu_temp_measurement(self):
-		temp_measure(experiment=self)
+		setup_temp_measure(experiment=self)
 
 
 
