@@ -326,6 +326,11 @@ class CpExperiment:
 				callback=self.queue_setup_automated_relaxation,
 			)
 
+			gui.add_button(
+				label='Temperature Measurement',
+				callback=self.queue_temp_measurement,
+			)
+
 
 
 	def update_stage_indicators(self, data):
@@ -402,6 +407,9 @@ class CpExperiment:
 
 	def queue_setup_automated_relaxation(self):
 		setup_automated_relaxation(experiment=self)
+
+	def queu_temp_measurement(self):
+		temp_measure(experiment=self)
 
 
 
