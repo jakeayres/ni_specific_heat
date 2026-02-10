@@ -12,59 +12,76 @@ from ..ui.plot import Plot
 
 def setup_temp_measure(self):
 
-	temp_window = gui.add_window(label='Temperature', pos=(0, 0), width=300)
-	self.live_temperature_plot = Plot.add_to_parent(temp_window, height=200, width=-1)
-	gui.add_button(
-		parent=temp_window, 
-		label='Clear plot', 
-		callback=self.live_temperature_plot.clear_all_series,
-		)
+	temp_window = gui.add_window(label='Temperature Measurement', pos=(550, 150), width=300)
 	self.temperature_indicator = DecimalIndicator.add_to_parent(temp_window, 'Temperature', 0, unit='K')
 	self.temperature_rate_indicator = DecimalIndicator.add_to_parent(temp_window, 'Rate', 0, unit='K/min')
+	self.filename = StringInput.add_to_parent(temp_window, 'Filename', 'temperature_measurements', unit=None)
 	
 	gui.add_button(
 	    parent=temp_window,
-		label='Save data',
-		callback=lambda: partial(
-			self.queue_temp_measure,
-		)
+		label='Start measurement',
+		callback=lambda:
+			queue_temp_measure(self),
+		
 	)
 		
 	gui.add_button(
 		parent=temp_window,
 		label='Stop measurement',
-		callback=lambda: partial(
-			self.stop_temp_measure,
-		)
+		callback=lambda:
+			stop_temp_measure(self),
+		
 	)
 
-def queue_temp_measure(self):
-	self.temp_measure_task = asyncio.create_task(self.measurement_loop(self.data))
-	
-async def measurement_loop(self,data):
-	temp_points = [[], [], []]
+async def measurement_loop(self,temperature_indicator,temperature_rate_indicator):
+	logger.info("Starting temperature measurement loop")
+	self.temp_points = [[], [], []]
 	start = time.time()
 	while True:
 		await asyncio.sleep(1)
 		try:
-			self.temp_update(data,temp_points,start)
+			temp_update(self,temperature_indicator,temperature_rate_indicator,self.temp_points,start)
 		except Exception as e:
 			logger.error(f"Error in temp measurement: {e}")
-	#save data
+
+
+def save_temp_measurement(self, temp_points, filestem):
 	temp_points_df = pd.DataFrame({
 		'time': temp_points[0],
 		'temperature': temp_points[1],
 		'rate': temp_points[2]
 	})
-	temp_points_df.to_csv(f'C://Data/{file_stem}_temp_measurement.csv', index=False, header=['time', 'temperature', 'rate'])
+	print(temp_points_df)
+	temp_points_df.to_csv(rf'C:\Data\Charlie_Hannah\temperature_measurements\{filestem}.csv', index=False, header=['time', 'temperature', 'rate'])
 
-def temp_update(self,data,temp_points,start):
+def queue_temp_measure(self):
+	if getattr(self, "_temp_task", None):
+		logger.warning("Measurement already running")
+		return
+
+	logger.info("Queueing temperature measurement task")
+	asyncio.set_event_loop(self.loop)
+	self._temp_task = self.loop.create_task(
+    	    measurement_loop(
+    	        self,
+    	        self.temperature_indicator,
+    	        self.temperature_rate_indicator,
+    	    )
+    	)	
+	logger.info("Temperature measurement started")
+
+
+def temp_update(self,temperature_indicator,temperature_rate_indicator,temp_points,start):
 	temp_points[0].append(time.time() - start)
-	temp_points[1].append(data['temperature'])
-	temp_points[2].append(data['rate'])
-
+	temp_points[1].append(temperature_indicator._value)
+	temp_points[2].append(temperature_rate_indicator._value)
+	logger.debug(f"Temp update: {temp_points[0][-1]:.2f}s, {temp_points[1][-1]:.2f}K, {temp_points[2][-1]:.2f}K/min")
 
 def stop_temp_measure(self):
-	task = getattr(self, "_measurement_task", None)
+	filestem = f"{self.filename._value}_{time.strftime('%Y_%m_%d_%H_%M')}"
+	task = getattr(self, "_temp_task", None)
 	if task and not task.done():
-		task.cancel()
+		self._temp_task.cancel()
+		save_temp_measurement(self, self.temp_points, filestem)
+		logger.info("Temperature measurement stopped and data saved")
+		self._temp_task = None

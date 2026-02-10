@@ -22,6 +22,7 @@ from src.ni_specific_heat.ui.plot import Plot
 
 from src.ni_specific_heat.routines.barechip_calibration import make_barechip_calibrations
 from src.ni_specific_heat.routines.relaxation import setup_relaxations, setup_single_relaxation, setup_automated_relaxation
+from src.ni_specific_heat.routines.temp_measurement import setup_temp_measure, measurement_loop, temp_update, queue_temp_measure, stop_temp_measure
 
 
 logger.remove()  # remove default handler
@@ -37,7 +38,7 @@ class CpExperiment:
 		logger.info('TEST')
 		self.calorimeters = self._load_calorimeters('calorimeter_config.json')
 		self.calibrations = [BarechipCalibration(), BarechipCalibration()]
-		self.stage_thermometer = StageThermometer(GPIB=2, input_channel=InputChannel.INPUT_A, output_channel=OutputChannel.OUTPUT_1)
+		self.stage_thermometer = StageThermometer(GPIB=3, input_channel=InputChannel.INPUT_A, output_channel=OutputChannel.OUTPUT_1)
 		self.tasks = []
 
 
@@ -408,8 +409,8 @@ class CpExperiment:
 	def queue_setup_automated_relaxation(self):
 		setup_automated_relaxation(experiment=self)
 
-	def queu_temp_measurement(self):
-		setup_temp_measure(experiment=self)
+	def queue_temp_measurement(self):
+		setup_temp_measure(self)
 
 
 
@@ -443,6 +444,7 @@ class CpExperiment:
 	async def run(self):
 		""" The main asyncio entry point
 		"""
+		self.loop = asyncio.get_running_loop()
 		self._initialize_dearpygui()
 		await self.setup_gui()
 		gui.show_viewport()
