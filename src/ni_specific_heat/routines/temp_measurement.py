@@ -47,7 +47,7 @@ async def measurement_loop(self,data):
 	while True:
 		await asyncio.sleep(1)
 		try:
-			self.temp_update(data,temp_points)
+			self.temp_update(data,temp_points,start)
 		except Exception as e:
 			logger.error(f"Error in temp measurement: {e}")
 	#save data
@@ -58,7 +58,7 @@ async def measurement_loop(self,data):
 	})
 	temp_points_df.to_csv(f'C://Data/{file_stem}_temp_measurement.csv', index=False, header=['time', 'temperature', 'rate'])
 
-def temp_update(self,data,temp_points):
+def temp_update(self,data,temp_points,start):
 	temp_points[0].append(time.time() - start)
 	temp_points[1].append(data['temperature'])
 	temp_points[2].append(data['rate'])
